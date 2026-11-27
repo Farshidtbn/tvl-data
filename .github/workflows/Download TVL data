@@ -1,0 +1,34 @@
+name: Download TVL data
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Get previous data from the release (if any)
+        run: gh release download data --pattern tvl_cache.jsonl --repo "$GITHUB_REPOSITORY" || true
+
+      - name: Download data
+        env:
+          TVL_MAX_MINUTES: "330"
+        run: python tvl_backtest.py download
+
+      - name: Publish data file in the release
+        if: always()
+        run: |
+          gh release view data --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create data --repo "$GITHUB_REPOSITORY" --title "TVL data" --notes "Latest TVL data file"
+          gh release upload data tvl_cache.jsonl --clobber --repo "$GITHUB_REPOSITORY"
